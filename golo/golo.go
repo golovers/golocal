@@ -1,14 +1,14 @@
 package golo
 
 import (
-	"strings"
-	"log"
-	"path"
-	"os"
 	"github.com/cf-guardian/guardian/kernel/fileutils"
+	"go/build"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"go/build"
+	"log"
+	"os"
+	"path"
+	"strings"
 )
 
 var (
@@ -19,7 +19,7 @@ type Config struct {
 	UseLocal []string
 }
 
-// Print the use local list
+// List prints the configured local packages
 func List() {
 	conf := getConf()
 	if len(conf.UseLocal) > 0 {
@@ -29,51 +29,72 @@ func List() {
 	}
 }
 
-// Write the config
-func UseLocal(names []string) {
-	conf := Config{
-		UseLocal: names,
+// Clear all configured local packages from config file
+func Clear() {
+	cfgFile := path.Join(getWd(), CONFIG_NAME)
+	if !isExists(cfgFile) {
+		log.Printf("Config file is not existed (%s)", cfgFile)
+		return
 	}
-	if data, err := yaml.Marshal(conf); err != nil {
-		log.Fatal(err)
+	if err := os.Remove(path.Join(getWd(), CONFIG_NAME)); err != nil {
+		log.Printf("Failed to clear configuration: %s", err.Error())
 	} else {
-		if err := ioutil.WriteFile(CONFIG_NAME, data, 0755); err != nil {
-			log.Fatal(err)
-		}
+		log.Print("All local packages configuration cleared")
+		// TODO: May remove source codes, too
 	}
 }
 
-// Load config
-func getConf() Config {
-	conf := Config{}
-	if f, err := ioutil.ReadFile(CONFIG_NAME); err != nil {
-		if os.IsNotExist(err) {
-			return Config{}
+// Remove local package(s) from config file
+func Remove(pkgs []string) {
+	cfg := getConf()
+
+	for _, pkg := range pkgs {
+		if idx, ok := contains(cfg.UseLocal, pkg); ok {
+			cfg.UseLocal = append(cfg.UseLocal[:idx], cfg.UseLocal[idx+1:]...)
+			log.Printf("Removed %s package", pkg)
+			continue
 		}
-	} else {
-		yaml.Unmarshal(f, &conf)
+		log.Printf("Ignored %s package", pkg)
 	}
-	return conf
+	cfg.writeToFile()
+}
+
+// Write the config
+func Add(pkgs []string) {
+	cfg := getConf()
+
+	for _, pkg := range pkgs {
+		if isExists(path.Join(getGoPath(), pkg)) {
+			if _, ok := contains(cfg.UseLocal, pkg); !ok {
+				cfg.UseLocal = append(cfg.UseLocal, pkg)
+			}
+			log.Printf("Added %s package", pkg)
+			continue
+		}
+		log.Printf("Ignored %s package", pkg)
+	}
+	cfg.writeToFile()
 }
 
 // Update the local repo as configured
 func Up() {
-	srcPath := path.Join(build.Default.GOPATH, "src")
-	currDir, _ := os.Getwd()
-	dstPath := path.Join(currDir, "vendor")
 	conf := getConf()
+	gp := getGoPath()
+	vendor := path.Join(getWd(), "vendor")
 
 	for _, pkg := range conf.UseLocal {
-		src := path.Join(srcPath, pkg)
-		dst := path.Join(dstPath, pkg)
-		log.Println("Use local for: ", dst)
-		os.RemoveAll(dst)
-		CopyDir(src, dst)
+		src := path.Join(gp, pkg)
+		dst := path.Join(vendor, pkg)
+		if err := os.RemoveAll(dst); err != nil {
+			log.Panicf("Failed to remove %s directory", dst)
+		}
+		copyDir(src, dst)
+		log.Printf("Vendored %s package", pkg)
 	}
 }
 
 // Get parent dir
-func ParentDir(dir string) string {
+func parentDir(dir string) string {
 	if strings.HasSuffix(dir, "/") {
 		dir = dir[:strings.LastIndex(dir, "/")]
 	}
@@ -81,11 +102,66 @@ func ParentDir(dir string) string {
 }
 
 // Copy whole src folder to dst folder
-func CopyDir(src string, dst string) {
-	if _, err := os.Stat(dst); err != nil && os.IsNotExist(err) {
-		os.MkdirAll(dst, 0755)
+func copyDir(src string, dst string) {
+	if !isExists(dst) {
+		if err := os.MkdirAll(dst, 0755); err != nil {
+			log.Panicf("Failed to create %s directory", dst)
+		}
 	}
 
 	f := fileutils.New()
-	f.Copy(ParentDir(dst), src)
+	if err :=f.Copy(parentDir(dst), src); err!= nil {
+		log.Panicf("Failed to copy %s directory to %s", src, dst)
+	}
+}
+
+// Load config
+func getConf() *Config {
+	conf := &Config{}
+	f, err := ioutil.ReadFile(CONFIG_NAME)
+	if err != nil {
+		return &Config{}
+	}
+	yaml.Unmarshal(f, &conf)
+	return conf
+}
+
+func getGoPath() string {
+	p := os.Getenv("GOPATH")
+	if p == "" {
+		p = build.Default.GOPATH
+	}
+	return path.Join(p, "src")
+}
+
+func getWd() string {
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Panic("Failed to get working directory")
+	}
+	return pwd
+}
+
+func isExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+func contains(pkgs []string, pkg string) (int, bool) {
+	for i, v := range pkgs {
+		if v == pkg {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+func (c *Config) writeToFile() {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		log.Panic(err)
+	}
+	if err := ioutil.WriteFile(CONFIG_NAME, data, 0755); err != nil {
+		log.Panic(err)
+	}
 }

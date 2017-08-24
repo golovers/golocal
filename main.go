@@ -2,28 +2,40 @@ package main
 
 import (
 	"flag"
-	"strings"
 	"github.com/golovers/golocal/golo"
+	"strings"
 )
 
 func main() {
-	importPackages := flag.String("import", "", "comma-separated list of packages that use local")
-	up := flag.Bool("up", false, "override the vendors by local")
-
-	lis := flag.Bool("list", false, "list of use local packages")
+	fAdd := flag.String("add", "", "Add list of packages that use local. Comma separated.")
+	fRemove := flag.String("remove", "", "Remove list of packages that used as local. Comma separated.")
+	fUp := flag.Bool("up", false, "Override the vendor by local packages")
+	fList := flag.Bool("list", false, "List of use local packages")
+	fClear := flag.Bool("clear", false, "Remove all local packages from config file")
 	flag.Parse()
 
-	// List
-	if *lis {
+	// List all configured local packages
+	if *fList {
 		golo.List()
+		return
 	}
-	// Update the package list
-	locals := strings.Split(*importPackages, ",")
-	if *importPackages != "" && len(locals) > 0 {
-		golo.UseLocal(locals)
+	// Clear all packages from config list
+	if *fClear {
+		golo.Clear()
+		return
 	}
-	// Update vendor
-	if *up {
+	// Remove local packages from config list
+	if *fRemove != "" {
+		golo.Remove(strings.Split(*fRemove, ","))
+		return
+	}
+	// Add new local packages to config list
+	if *fAdd != "" {
+		golo.Add(strings.Split(*fAdd, ","))
+		return
+	}
+	// Override vendor by configured local packages
+	if *fUp {
 		golo.Up()
 	}
 }
