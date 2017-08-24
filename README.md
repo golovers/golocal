@@ -27,26 +27,3 @@ Examples:
   ./golocal -up
   ./golocal -clear
 ```
-
-1. Help: 
-
-   ```shell
-   golocal -h
-   ```
-
-2. Configure to use local for some packages:
-
-   ```shell
-   golocal -add "github.com/package1,github.com/package2,gitlab.com/package3"
-   ```
-
-   Or you can update the configuration file directly at `vendor/vendor.local`
-
-
-3. Pull local code to override remote code
-
-   ```shell
-   golocal -up
-   ```
-
-   ​
