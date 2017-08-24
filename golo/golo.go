@@ -48,16 +48,14 @@ func Clear() {
 func Remove(pkgs []string) {
 	cfg := getConf()
 
-	nPkgs := make([]string, len(cfg.UseLocal))
 	for _, pkg := range pkgs {
 		if idx, ok := contains(cfg.UseLocal, pkg); ok {
 			cfg.UseLocal = append(cfg.UseLocal[:idx], cfg.UseLocal[idx+1:]...)
 			log.Printf("Removed %s package", pkg)
-		} else {
-			nPkgs = append(nPkgs, pkg)
+			continue
 		}
+		log.Printf("Ignored %s package", pkg)
 	}
-	cfg.UseLocal = nPkgs
 	cfg.writeToFile()
 }
 
@@ -69,9 +67,11 @@ func Add(pkgs []string) {
 		if isExists(path.Join(getGoPath(), pkg)) {
 			if _, ok := contains(cfg.UseLocal, pkg); !ok {
 				cfg.UseLocal = append(cfg.UseLocal, pkg)
-				log.Printf("Added %s package", pkg)
 			}
+			log.Printf("Added %s package", pkg)
+			continue
 		}
+		log.Printf("Ignored %s package", pkg)
 	}
 	cfg.writeToFile()
 }
