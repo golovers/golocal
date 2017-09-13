@@ -108,10 +108,9 @@ func copyDir(src string, dst string) {
 			log.Panicf("Failed to create %s directory", dst)
 		}
 	}
-
 	f := fileutils.New()
-	if err :=f.Copy(parentDir(dst), src); err!= nil {
-		log.Panicf("Failed to copy %s directory to %s", src, dst)
+	if err := f.Copy(parentDir(dst), src); err != nil {
+		log.Printf("**ERROR** Failed to copy %s directory to %s\n", src, dst)
 	}
 }
 
@@ -157,6 +156,13 @@ func contains(pkgs []string, pkg string) (int, bool) {
 }
 
 func (c *Config) writeToFile() {
+	if _, err := os.Stat("vendor"); err != nil {
+		if os.IsNotExist(err) {
+			os.Mkdir("vendor", 0755)
+		} else {
+			log.Panic(err)
+		}
+	}
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		log.Panic(err)
